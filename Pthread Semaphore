@@ -1,0 +1,83 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <time.h>
+#include <unistd.h>
+
+#define NUM_TASKS 12
+
+typedef struct {
+    double a, b, res;
+    int id;
+    int thread_idx;
+    const char* op_name;
+} ThreadData;
+
+sem_t sem_start, sem_done;
+
+void* calc_fn(void* arg) {
+    ThreadData* d = (ThreadData*)arg;
+    sem_wait(&sem_start);
+    // Simple math logic based on assigned op_name
+    if (d->op_name[0] == 'A') d->res = d->a + d->b;
+    else if (d->op_name[0] == 'S') d->res = d->a - d->b;
+    else if (d->op_name[0] == 'M') d->res = d->a * d->b;
+    else d->res = (d->b != 0) ? (d->a / d->b) : 0;
+
+    sem_post(&sem_done);
+    return NULL;
+}
+
+int main() {
+    srand(time(NULL));
+    FILE *fp = fopen("results.txt", "w");
+    if (!fp) return 1;
+
+    sem_init(&sem_start, 0, 0);
+    sem_init(&sem_done, 0, 0);
+
+    pthread_t threads[NUM_TASKS];
+    ThreadData data[NUM_TASKS];
+    const char* names[] = {"ADD", "SUB", "MUL", "DIV"};
+
+    for (int i = 0; i < NUM_TASKS; i++) {
+        data[i].id = i + 1;
+        data[i].thread_idx = i;
+        data[i].a = (rand() % 100) + 1;
+        data[i].b = (rand() % 100) + 1;
+        data[i].op_name = names[rand() % 4];
+        pthread_create(&threads[i], NULL, calc_fn, &data[i]);
+    }
+
+    for (int i = 0; i < NUM_TASKS; i++) sem_post(&sem_start);
+    for (int i = 0; i < NUM_TASKS; i++) sem_wait(&sem_done);
+
+    // Shuffle for random print order
+    for (int i = NUM_TASKS - 1; i > 0; i--) {
+        int j = rand() % (i + 1);
+        ThreadData temp = data[i];
+        data[i] = data[j];
+        data[j] = temp;
+    }
+
+    printf("--- Saving Results to File ---\n");
+    fprintf(fp, "Batch Results (Randomized Order):\n");
+    for (int i = 0; i < NUM_TASKS; i++) {
+        // Output to console
+        printf(" Thread %02d | Task %03d [%s]: %.1f, %.1f = %.2f\n",
+                data[i].thread_idx, data[i].id, data[i].op_name, data[i].a, data[i].b, data[i].res);
+
+        // Output to file
+        fprintf(fp, "Thread %02d | Task %03d [%-3s]: %.1f, %.1f = %.2f\n",
+                data[i].thread_idx, data[i].id, data[i].op_name, data[i].a, data[i].b, data[i].res);
+
+        pthread_join(threads[data[i].thread_idx], NULL);
+    }
+
+    fclose(fp);
+    sem_destroy(&sem_start);
+    sem_destroy(&sem_done);
+    printf("Done. File 'results.txt' has been created.\n");
+    return 0;
+}
