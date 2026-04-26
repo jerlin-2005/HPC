@@ -1,0 +1,135 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+#define CONSTANT 5.0
+
+void process_array(long n) {
+    long i;
+    int k;
+
+    double *A = (double *)malloc(n * sizeof(double));
+    if (A == NULL) {
+        printf("Memory allocation failed!\n");
+        return;
+    }
+
+    for (i = 0; i < n; i++) {
+        A[i] = (double)i;
+    }
+
+    double start = omp_get_wtime();
+
+    #pragma omp parallel for schedule(static)
+    for (i = 0; i < n; i++) {
+        A[i] += CONSTANT;
+    }
+
+    double end = omp_get_wtime();
+
+    printf("\nSize: %ld\n", n);
+    printf("Time: %f seconds\n", end - start);
+
+    long indices[] = {0, n / 2, n - 1};
+
+    printf("%-12s %-12s %-12s %-12s\n", "Index", "Original", "Constant", "Result");
+    printf("----------------------------------------------------------\n");
+
+    for (k = 0; k < 3; k++) {
+        long idx = indices[k];
+        printf("%-12ld %-12.1f +%-11.1f =%-12.1f\n", idx, (double)idx, CONSTANT, A[idx]);
+    }
+    printf("\n");
+
+    free(A);
+}
+
+int main() {
+    long user_size;
+
+    printf("=== OpenMP Matrix Processor ===\n");
+    printf("Enter 0 or a negative number to exit.\n\n");
+
+    // Loop until the user decides to exit
+    while (1) {
+        printf("Enter array size: ");
+
+        // Check if input is a valid number
+        if (scanf("%ld", &user_size) != 1) {
+            printf("Invalid input. Exiting...\n");
+            break;
+        }
+
+        // Exit condition
+        if (user_size <= 0) {
+            printf("Exiting program\n");
+            break;
+        }
+
+        process_array(user_size);
+    }
+
+    return 0;
+}
+
+
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+int main(int argc, char* argv[]) {
+    int n;                  // Size of arrays
+    int thread_count;       // Number of threads
+    char *end;
+
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <thread_count>\n", argv[0]);
+        return 1;
+    }
+
+    long t = strtol(argv[1], &end, 10);
+    if (*end != '\0' || t <= 0) {
+        fprintf(stderr, "Invalid thread count: %s\n", argv[1]);
+        return 1;
+    }
+    thread_count = (int)t;
+
+    printf("Enter size of arrays:\n");
+    if (scanf("%d", &n) != 1 || n <= 0) {
+        fprintf(stderr, "Invalid array size\n");
+        return 1;
+    }
+
+    double* A = (double*) malloc((size_t)n * sizeof(double));
+    double* B = (double*) malloc((size_t)n * sizeof(double));
+    double* C = (double*) malloc((size_t)n * sizeof(double));
+
+    if (!A || !B || !C) {
+        perror("malloc");
+        free(A); free(B); free(C);
+        return 1;
+    }
+
+    for (int i = 0; i < n; i++) {
+        A[i] = (double)i;
+        B[i] = (double)(i * 2);
+    }
+
+    #pragma omp parallel for num_threads(thread_count)
+    for (int i = 0; i < n; i++) {
+        C[i] = A[i] + B[i];
+    }
+
+    printf("result array:\n");
+    for (int i = 0; i < 15 && i < n; i++) {
+        printf("C[%d] = %.2f\t", i, C[i]);
+    }
+
+    free(A);
+    free(B);
+    free(C);
+
+    return 0;
+}
+
