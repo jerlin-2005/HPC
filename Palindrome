@@ -1,0 +1,68 @@
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+#include <mpi.h>
+
+#define MAX_LENGTH 100
+
+void make_upper(char* msg, int rank) {
+    double start_time = MPI_Wtime();
+    int i;
+    for (i = 0; msg[i]; i++) {
+        msg[i] = toupper(msg[i]);
+    }
+    double end_time = MPI_Wtime();
+    printf("Process %d | String: %s | Output: %s | Execution Time: %f milliseconds\n", rank, msg, msg, (end_time - start_time) * 1000);
+}
+
+void check_palin(char* msg, int rank) {
+    double start_time = MPI_Wtime();
+    int i, len = strlen(msg), ok = 1;
+    for (i = 0; i < len / 2; i++) {
+        if (msg[i] != msg[len - i - 1]) ok = 0;
+    }
+    double end_time = MPI_Wtime();
+    printf("Process %d | String: %s | Output: %s | Execution Time: %f milliseconds\n", rank, msg, ok ? "Palindrome" : "Not Palindrome", (end_time - start_time) * 1000);
+}
+
+int main() {
+    int rank, size;
+
+    char strings[][MAX_LENGTH] = {
+        "racecar",
+        "computing",
+        "malayalam",
+        "nice to meet you",
+        "hello"
+    };
+
+    MPI_Init(NULL, NULL);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    int num_strings = sizeof(strings) / MAX_LENGTH;
+    if (size < num_strings + 1) {
+        if (rank == 0) {
+            printf("Number of processes must be at least %d\n", num_strings + 1);
+        }
+        MPI_Finalize();
+        return -1;
+    }
+
+    if (rank == 0) {
+        for (int i = 1; i <= num_strings; i++) {
+            MPI_Send(strings[i - 1], strlen(strings[i - 1]) + 1, MPI_CHAR, i, 0, MPI_COMM_WORLD);
+        }
+    } else {
+        char msg[MAX_LENGTH];
+        MPI_Recv(msg, MAX_LENGTH, MPI_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        if (rank % 2 == 0) {
+            make_upper(msg, rank);
+        } else {
+            check_palin(msg, rank);
+        }
+    }
+
+    MPI_Finalize();
+    return 0;
+}
