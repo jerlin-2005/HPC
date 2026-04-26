@@ -1,0 +1,64 @@
+#include <mpi.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+int main() {
+    int rank, size, target;
+    int full_array[12];
+    int local_count = 0, total_count = 0;
+    MPI_Init(NULL, NULL);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    double start_time, end_time;
+
+    if (rank == 0) {
+        //printf("Enter target number: ");
+        scanf("%d", &target);
+
+
+        printf("Array: ");
+        for (int j = 0; j < 12; j++) {
+            full_array[j] = rand() % 10;
+            printf("%d ", full_array[j]);
+        }
+        printf("\n");
+    }
+
+    MPI_Bcast(&target, 1, MPI_INT, 0, MPI_COMM_WORLD);
+     int k,l;
+    int chunk = 12 / size;
+    int sub_array[chunk];
+    MPI_Scatter(full_array, chunk, MPI_INT, sub_array, chunk, MPI_INT, 0, MPI_COMM_WORLD);
+
+        start_time = MPI_Wtime();
+        int counter = 0; // Counter to track occurrences
+        for (k = 0; k < chunk; k++) { // k is declared before the loop
+            if (sub_array[k] == target) counter++;
+        }
+        local_count = counter; // Store count in local_count
+
+        // Stop timing for counting
+        end_time = MPI_Wtime();
+
+        // Print out the sub-array and frequency of the target
+        printf("Process %d - Sub-array: ", rank);
+        for (l = 0; l < chunk; l++) { // l is declared before the loop
+            printf("%d ", sub_array[l]);
+        }
+        printf("\nProcess %d - Frequency of %d in sub-array: %d\n", rank, target, local_count);
+
+        // Convert to nanoseconds
+        double time_taken_ns = (end_time - start_time) * 1000000000;
+        printf("Process %d - Time taken for counting: %.0f nanoseconds\n", rank, time_taken_ns);
+
+    // Reduce the counts to a total count at the root process
+    MPI_Reduce(&local_count, &total_count, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+    // Only the master process prints the total frequency
+    if (rank == 0) {
+        printf("Total Frequency of %d: %d\n", target, total_count);
+    }
+
+    MPI_Finalize();
+    return 0;
+}
